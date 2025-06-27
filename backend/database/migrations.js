@@ -21,6 +21,9 @@ import { addPermissionsTables } from './migrations/add-permissions-tables.js';
 import { removeUsersRoleConstraint } from './migrations/remove-users-role-constraint.js';
 import { addUserSpecificPermissionsTable } from './migrations/add-user-specific-permissions-table.js';
 import { createCabinetCatalogTables } from './migrations/cabinet-catalog-tables.js';
+import { createPartTypesTable } from './migrations/create-part-types-table.js';
+import { addGrainDirectionToCabinetParts } from './migrations/add-grain-direction-to-cabinet-parts.js';
+import { createAccessoriesTables } from './migrations/create-accessories-tables.js';
 
 const migrations = [
   {
@@ -122,6 +125,21 @@ const migrations = [
     version: 23,
     name: 'cabinet_catalog_tables',
     execute: createCabinetCatalogTables
+  },
+  {
+    version: 24,
+    name: 'part_types_table',
+    execute: createPartTypesTable
+  },
+  {
+    version: 25,
+    name: 'add_grain_direction_to_cabinet_parts',
+    execute: addGrainDirectionToCabinetParts
+  },
+  {
+    version: 26,
+    name: 'accessories_tables',
+    execute: createAccessoriesTables
   }
 ];
 

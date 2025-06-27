@@ -420,6 +420,10 @@ export const addSampleCabinetData = async () => {
     
     console.log('✅ Added sample cabinet project');
     
+    // Add part types and model parts for the first model
+    await addSamplePartTypes();
+    await addSampleModelParts(baseModel[0].id);
+    
     console.log('✅ Sample cabinet data added successfully!');
   } catch (error) {
     console.error('❌ Error adding sample cabinet data:', error);
@@ -464,7 +468,7 @@ async function generateSampleParts(projectItemId, item) {
     const doorWidth = item.width;
     const doorHeight = item.height;
     
-    // Get material costs once
+    // Get material costs
     const materialCostQuery = await runQuery('SELECT cost_per_unit FROM cabinet_materials WHERE id = ?', [panelMaterialId]);
     const materialCost = materialCostQuery[0]?.cost_per_unit || 0;
     
@@ -487,7 +491,8 @@ async function generateSampleParts(projectItemId, item) {
         edge_banding_left: false,
         edge_banding_right: true,
         edge_material_id: edgeMaterialId,
-        notes: 'Left side panel'
+        notes: 'Left side panel',
+        grain_direction: 'with_grain'
       },
       // Right side
       {
@@ -503,7 +508,8 @@ async function generateSampleParts(projectItemId, item) {
         edge_banding_left: true,
         edge_banding_right: false,
         edge_material_id: edgeMaterialId,
-        notes: 'Right side panel'
+        notes: 'Right side panel',
+        grain_direction: 'with_grain'
       },
       // Top
       {
@@ -519,7 +525,8 @@ async function generateSampleParts(projectItemId, item) {
         edge_banding_left: false,
         edge_banding_right: true,
         edge_material_id: edgeMaterialId,
-        notes: 'Top panel'
+        notes: 'Top panel',
+        grain_direction: 'against_grain'
       },
       // Bottom
       {
@@ -535,7 +542,8 @@ async function generateSampleParts(projectItemId, item) {
         edge_banding_left: false,
         edge_banding_right: true,
         edge_material_id: edgeMaterialId,
-        notes: 'Bottom panel'
+        notes: 'Bottom panel',
+        grain_direction: 'against_grain'
       },
       // Back
       {
@@ -551,7 +559,8 @@ async function generateSampleParts(projectItemId, item) {
         edge_banding_left: false,
         edge_banding_right: false,
         edge_material_id: null,
-        notes: 'Back panel'
+        notes: 'Back panel',
+        grain_direction: 'no_grain'
       },
       // Shelf
       {
@@ -567,7 +576,8 @@ async function generateSampleParts(projectItemId, item) {
         edge_banding_left: false,
         edge_banding_right: true,
         edge_material_id: edgeMaterialId,
-        notes: 'Adjustable shelf'
+        notes: 'Adjustable shelf',
+        grain_direction: 'against_grain'
       },
       // Door
       {
@@ -583,7 +593,8 @@ async function generateSampleParts(projectItemId, item) {
         edge_banding_left: true,
         edge_banding_right: true,
         edge_material_id: edgeMaterialId,
-        notes: 'Cabinet door'
+        notes: 'Cabinet door',
+        grain_direction: 'with_grain'
       }
     ];
     
@@ -610,16 +621,297 @@ async function generateSampleParts(projectItemId, item) {
           project_id, project_item_id, name, part_type, material_id,
           width, height, thickness, quantity,
           edge_banding_top, edge_banding_bottom, edge_banding_left, edge_banding_right,
-          edge_material_id, notes, unit_cost, total_cost
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          edge_material_id, notes, unit_cost, total_cost, grain_direction
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         projectId, projectItemId, part.name, part.part_type, part.material_id,
         part.width, part.height, part.thickness, part.quantity,
         part.edge_banding_top, part.edge_banding_bottom, part.edge_banding_left, part.edge_banding_right,
-        part.edge_material_id, part.notes, unitCost, totalCost
+        part.edge_material_id, part.notes, unitCost, totalCost, part.grain_direction
       ]);
     }
   } catch (error) {
     console.error('Error generating sample parts:', error);
+  }
+}
+
+// Helper function to add sample part types
+async function addSamplePartTypes() {
+  try {
+    // Check if we already have part types
+    const existingPartTypes = await runQuery('SELECT COUNT(*) as count FROM part_types');
+    if (existingPartTypes[0].count > 0) {
+      console.log('Sample part types already exist, skipping...');
+      return;
+    }
+
+    // Add part types
+    const partTypes = [
+      {
+        name: 'Side Panel',
+        description: 'Cabinet side panel',
+        default_formula_width: 'cabinet_depth',
+        default_formula_height: 'cabinet_height',
+        default_thickness: 18,
+        default_material_type: 'panel',
+        default_edge_material_type: 'edge_banding'
+      },
+      {
+        name: 'Bottom Panel',
+        description: 'Cabinet bottom panel',
+        default_formula_width: 'cabinet_width - (2 * panel_thickness)',
+        default_formula_height: 'cabinet_depth',
+        default_thickness: 18,
+        default_material_type: 'panel',
+        default_edge_material_type: 'edge_banding'
+      },
+      {
+        name: 'Top Panel',
+        description: 'Cabinet top panel',
+        default_formula_width: 'cabinet_width - (2 * panel_thickness)',
+        default_formula_height: 'cabinet_depth',
+        default_thickness: 18,
+        default_material_type: 'panel',
+        default_edge_material_type: 'edge_banding'
+      },
+      {
+        name: 'Back Panel',
+        description: 'Cabinet back panel',
+        default_formula_width: 'cabinet_width - (2 * panel_thickness)',
+        default_formula_height: 'cabinet_height - (2 * panel_thickness)',
+        default_thickness: 6,
+        default_material_type: 'back_panel',
+        default_edge_material_type: null
+      },
+      {
+        name: 'Shelf',
+        description: 'Adjustable shelf',
+        default_formula_width: 'cabinet_width - (2 * panel_thickness) - 2',
+        default_formula_height: 'cabinet_depth - 20',
+        default_thickness: 18,
+        default_material_type: 'panel',
+        default_edge_material_type: 'edge_banding'
+      },
+      {
+        name: 'Door',
+        description: 'Cabinet door',
+        default_formula_width: 'cabinet_width - 10',
+        default_formula_height: 'cabinet_height - 10',
+        default_thickness: 18,
+        default_material_type: 'panel',
+        default_edge_material_type: 'edge_banding'
+      },
+      {
+        name: 'Drawer Front',
+        description: 'Drawer front panel',
+        default_formula_width: 'cabinet_width - 10',
+        default_formula_height: '150',
+        default_thickness: 18,
+        default_material_type: 'panel',
+        default_edge_material_type: 'edge_banding'
+      },
+      {
+        name: 'Drawer Side',
+        description: 'Drawer side panel',
+        default_formula_width: 'cabinet_depth - 40',
+        default_formula_height: '150',
+        default_thickness: 15,
+        default_material_type: 'panel',
+        default_edge_material_type: 'edge_banding'
+      },
+      {
+        name: 'Drawer Back',
+        description: 'Drawer back panel',
+        default_formula_width: 'cabinet_width - (2 * 15) - 10',
+        default_formula_height: '150',
+        default_thickness: 15,
+        default_material_type: 'panel',
+        default_edge_material_type: 'edge_banding'
+      },
+      {
+        name: 'Drawer Bottom',
+        description: 'Drawer bottom panel',
+        default_formula_width: 'cabinet_width - (2 * 15) - 10',
+        default_formula_height: 'cabinet_depth - 40',
+        default_thickness: 6,
+        default_material_type: 'back_panel',
+        default_edge_material_type: null
+      }
+    ];
+
+    for (const partType of partTypes) {
+      await runStatement(`
+        INSERT INTO part_types (
+          name, description, default_formula_width, default_formula_height,
+          default_thickness, default_material_type, default_edge_material_type
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [
+        partType.name,
+        partType.description,
+        partType.default_formula_width,
+        partType.default_formula_height,
+        partType.default_thickness,
+        partType.default_material_type,
+        partType.default_edge_material_type
+      ]);
+    }
+    console.log('✅ Added sample part types');
+  } catch (error) {
+    console.error('Error adding sample part types:', error);
+  }
+}
+
+// Helper function to add sample model parts
+async function addSampleModelParts(modelId) {
+  try {
+    // Check if model already has parts
+    const existingParts = await runQuery('SELECT COUNT(*) as count FROM cabinet_model_parts WHERE model_id = ?', [modelId]);
+    if (existingParts[0].count > 0) {
+      console.log('Model already has parts, skipping...');
+      return;
+    }
+
+    // Get part type IDs
+    const partTypes = await runQuery('SELECT id, name FROM part_types');
+    const partTypeMap = {};
+    partTypes.forEach(pt => {
+      partTypeMap[pt.name] = pt.id;
+    });
+
+    // Add model parts
+    const modelParts = [
+      {
+        part_type_id: partTypeMap['Side Panel'],
+        quantity_formula: '2',
+        custom_formula_width: null,
+        custom_formula_height: null,
+        default_edge_top: true,
+        default_edge_bottom: true,
+        default_edge_left: false,
+        default_edge_right: true,
+        sort_order: 1
+      },
+      {
+        part_type_id: partTypeMap['Bottom Panel'],
+        quantity_formula: '1',
+        custom_formula_width: null,
+        custom_formula_height: null,
+        default_edge_top: false,
+        default_edge_bottom: false,
+        default_edge_left: false,
+        default_edge_right: true,
+        sort_order: 2
+      },
+      {
+        part_type_id: partTypeMap['Top Panel'],
+        quantity_formula: '1',
+        custom_formula_width: null,
+        custom_formula_height: null,
+        default_edge_top: false,
+        default_edge_bottom: false,
+        default_edge_left: false,
+        default_edge_right: true,
+        sort_order: 3
+      },
+      {
+        part_type_id: partTypeMap['Back Panel'],
+        quantity_formula: '1',
+        custom_formula_width: null,
+        custom_formula_height: null,
+        default_edge_top: false,
+        default_edge_bottom: false,
+        default_edge_left: false,
+        default_edge_right: false,
+        sort_order: 4
+      },
+      {
+        part_type_id: partTypeMap['Shelf'],
+        quantity_formula: '1',
+        custom_formula_width: null,
+        custom_formula_height: null,
+        default_edge_top: false,
+        default_edge_bottom: false,
+        default_edge_left: false,
+        default_edge_right: true,
+        sort_order: 5
+      },
+      {
+        part_type_id: partTypeMap['Door'],
+        quantity_formula: 'cabinet_width < 600 ? 1 : 2',
+        custom_formula_width: 'cabinet_width < 600 ? cabinet_width - 10 : (cabinet_width / 2) - 5',
+        custom_formula_height: null,
+        default_edge_top: true,
+        default_edge_bottom: true,
+        default_edge_left: true,
+        default_edge_right: true,
+        sort_order: 6
+      }
+    ];
+
+    for (const part of modelParts) {
+      await runStatement(`
+        INSERT INTO cabinet_model_parts (
+          model_id, part_type_id, quantity_formula, custom_formula_width,
+          custom_formula_height, default_edge_top, default_edge_bottom,
+          default_edge_left, default_edge_right, sort_order
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        modelId,
+        part.part_type_id,
+        part.quantity_formula,
+        part.custom_formula_width,
+        part.custom_formula_height,
+        part.default_edge_top ? 1 : 0,
+        part.default_edge_bottom ? 1 : 0,
+        part.default_edge_left ? 1 : 0,
+        part.default_edge_right ? 1 : 0,
+        part.sort_order
+      ]);
+    }
+    console.log('✅ Added sample model parts');
+
+    // Add model accessories
+    const accessories = await runQuery('SELECT id, name FROM cabinet_accessories');
+    const accessoryMap = {};
+    accessories.forEach(acc => {
+      accessoryMap[acc.name] = acc.id;
+    });
+
+    // Add model accessories
+    const modelAccessories = [
+      {
+        accessory_id: accessoryMap['Concealed Hinge'],
+        quantity_formula: 'cabinet_width < 600 ? 2 : 4',
+        is_required: true
+      },
+      {
+        accessory_id: accessoryMap['Cabinet Handle'],
+        quantity_formula: 'cabinet_width < 600 ? 1 : 2',
+        is_required: true
+      },
+      {
+        accessory_id: accessoryMap['Shelf Pin'],
+        quantity_formula: '4',
+        is_required: true
+      }
+    ];
+
+    for (const accessory of modelAccessories) {
+      if (accessory.accessory_id) {
+        await runStatement(`
+          INSERT INTO cabinet_model_accessories (
+            model_id, accessory_id, quantity_formula, is_required
+          ) VALUES (?, ?, ?, ?)
+        `, [
+          modelId,
+          accessory.accessory_id,
+          accessory.quantity_formula,
+          accessory.is_required ? 1 : 0
+        ]);
+      }
+    }
+    console.log('✅ Added sample model accessories');
+  } catch (error) {
+    console.error('Error adding sample model parts:', error);
   }
 }

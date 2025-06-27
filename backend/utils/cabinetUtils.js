@@ -1,7 +1,248 @@
 import { runQuery } from '../database/connection.js';
 
+// Formula evaluator function - safely evaluates parametric formulas
+const evaluateFormula = (formula, context) => {
+  if (!formula) return 0;
+  
+  try {
+    // Create a safe evaluation function that only allows basic math operations
+    // This is much safer than using eval()
+    const safeEval = (formula, context) => {
+      // Replace variable names with their values from context
+      let expression = formula;
+      
+      // Sort context keys by length (descending) to avoid partial replacements
+      // e.g., replace 'cabinet_width' before 'width'
+      const contextKeys = Object.keys(context).sort((a, b) => b.length - a.length);
+      
+      for (const key of contextKeys) {
+        const value = context[key];
+        // Use regex with word boundaries to ensure we're replacing whole variable names
+        const regex = new RegExp(`\\b${key}\\b`, 'g');
+        expression = expression.replace(regex, value);
+      }
+      
+      // Use Function constructor instead of eval for slightly better safety
+      // Still restricted to basic math operations
+      const mathFunctions = {
+        min: Math.min,
+        max: Math.max,
+        round: Math.round,
+        floor: Math.floor,
+        ceil: Math.ceil,
+        abs: Math.abs
+      };
+      
+      // Create a function with math functions and the expression
+      const func = new Function(...Object.keys(mathFunctions), 'return ' + expression);
+      
+      // Call the function with math function values
+      return func(...Object.values(mathFunctions));
+    };
+    
+    return safeEval(formula, context);
+  } catch (error) {
+    console.error(`Error evaluating formula "${formula}":`, error);
+    return 0; // Default to 0 on error
+  }
+};
+
 // Calculate cabinet parts based on model and dimensions
 export const calculateCabinetParts = async (cabinetData) => {
+  const {
+    model_id,
+    width,
+    height,
+    depth,
+    panel_material_id,
+    edge_material_id,
+    back_material_id,
+    door_material_id,
+    hardware_config = {}
+  } = cabinetData;
+  
+  try {
+    // Get model details
+    const models = await runQuery('SELECT * FROM cabinet_models WHERE id = ?', [model_id]);
+    if (models.length === 0) {
+      throw new Error('Cabinet model not found');
+    }
+    
+    const model = models[0];
+    
+    // Get material details
+    const panelMaterial = panel_material_id ? 
+      (await runQuery('SELECT * FROM cabinet_materials WHERE id = ?', [panel_material_id]))[0] : null;
+    
+    const edgeMaterial = edge_material_id ? 
+      (await runQuery('SELECT * FROM cabinet_materials WHERE id = ?', [edge_material_id]))[0] : null;
+    
+    const backMaterial = back_material_id ? 
+      (await runQuery('SELECT * FROM cabinet_materials WHERE id = ?', [back_material_id]))[0] : null;
+    
+    const doorMaterial = door_material_id ? 
+      (await runQuery('SELECT * FROM cabinet_materials WHERE id = ?', [door_material_id]))[0] : null;
+    
+    // Default material thickness
+    const panelThickness = panelMaterial?.thickness || 18; // mm
+    const backThickness = backMaterial?.thickness || 6; // mm
+    
+    // Get model parts configuration
+    const modelParts = await runQuery(`
+      SELECT 
+        cmp.*,
+        pt.name as part_type_name,
+        pt.description as part_type_description,
+        pt.default_formula_width,
+        pt.default_formula_height,
+        pt.default_thickness,
+        pt.default_material_type,
+        pt.default_edge_material_type
+      FROM cabinet_model_parts cmp
+      JOIN part_types pt ON cmp.part_type_id = pt.id
+      WHERE cmp.model_id = ?
+      ORDER BY cmp.sort_order
+    `, [model_id]);
+    
+    // If no model parts are defined, fall back to the legacy method
+    if (modelParts.length === 0) {
+      return legacyCalculateCabinetParts(cabinetData);
+    }
+    
+    // Parts array to store all cabinet parts
+    const parts = [];
+    
+    // Create evaluation context for formulas
+    const context = {
+      cabinet_width: width,
+      cabinet_height: height,
+      cabinet_depth: depth,
+      panel_thickness: panelThickness,
+      back_thickness: backThickness,
+      door_count: 1, // Default, can be overridden
+      drawer_count: 0, // Default, can be overridden
+      shelf_count: 1, // Default, can be overridden
+      drawer_side_thickness: 15 // Default, can be overridden
+    };
+    
+    // Determine door count based on width (simple heuristic)
+    if (width >= 600) {
+      context.door_count = 2;
+    }
+    
+    // Process each model part
+    for (const modelPart of modelParts) {
+      // Evaluate quantity formula to determine how many of this part to create
+      const quantity = Math.max(1, Math.round(evaluateFormula(modelPart.quantity_formula, context)));
+      
+      // For each quantity, create a part
+      for (let i = 0; i < quantity; i++) {
+        // Determine which formulas to use (custom or default)
+        const widthFormula = modelPart.custom_formula_width || modelPart.default_formula_width;
+        const heightFormula = modelPart.custom_formula_height || modelPart.default_formula_height;
+        
+        // Evaluate the formulas
+        const partWidth = evaluateFormula(widthFormula, context);
+        const partHeight = evaluateFormula(heightFormula, context);
+        const partThickness = modelPart.default_thickness || panelThickness;
+        
+        // Determine material ID based on part type
+        let materialId = panel_material_id;
+        if (modelPart.default_material_type === 'back_panel') {
+          materialId = back_material_id || panel_material_id;
+        } else if (modelPart.part_type_name.toLowerCase().includes('door')) {
+          materialId = door_material_id || panel_material_id;
+        }
+        
+        // Determine edge banding
+        const edgeTop = modelPart.default_edge_top || false;
+        const edgeBottom = modelPart.default_edge_bottom || false;
+        const edgeLeft = modelPart.default_edge_left || false;
+        const edgeRight = modelPart.default_edge_right || false;
+        
+        // Add the part
+        addPart(
+          parts,
+          `${modelPart.part_type_name} ${i + 1}`,
+          modelPart.part_type_name.toLowerCase().replace(/\s+/g, '_'),
+          materialId,
+          partWidth,
+          partHeight,
+          partThickness,
+          1, // Quantity is always 1 here since we're creating multiple parts in the loop
+          edgeTop,
+          edgeBottom,
+          edgeLeft,
+          edgeRight,
+          edge_material_id,
+          modelPart.part_type_description || `${modelPart.part_type_name} for cabinet`,
+          panelMaterial?.cost_per_unit || 0,
+          edgeMaterial?.cost_per_unit || 0,
+          'no_grain' // Default grain direction
+        );
+      }
+    }
+    
+    // Get model accessories
+    const modelAccessories = await runQuery(`
+      SELECT 
+        cma.*,
+        ca.name as accessory_name,
+        ca.description as accessory_description,
+        ca.type as accessory_type,
+        ca.unit_cost,
+        ca.default_quantity_formula
+      FROM cabinet_model_accessories cma
+      JOIN cabinet_accessories ca ON cma.accessory_id = ca.id
+      WHERE cma.model_id = ?
+    `, [model_id]);
+    
+    // If model accessories are defined, use them
+    if (modelAccessories.length > 0) {
+      for (const accessory of modelAccessories) {
+        // Evaluate quantity formula
+        const formula = accessory.quantity_formula || accessory.default_quantity_formula || '1';
+        const quantity = Math.max(1, Math.round(evaluateFormula(formula, context)));
+        
+        // Add accessory as a "part" for cost calculation
+        parts.push({
+          name: accessory.accessory_name,
+          part_type: 'hardware',
+          material_id: null,
+          width: 0,
+          height: 0,
+          thickness: 0,
+          quantity: quantity,
+          edge_banding_top: false,
+          edge_banding_bottom: false,
+          edge_banding_left: false,
+          edge_banding_right: false,
+          edge_material_id: null,
+          notes: accessory.accessory_description || `${accessory.accessory_name} for cabinet`,
+          unit_cost: accessory.unit_cost,
+          total_cost: accessory.unit_cost * quantity
+        });
+      }
+    } else {
+      // Fall back to legacy hardware calculation if no model accessories defined
+      addHardwareCosts(parts, hardware_config, width >= 600);
+    }
+    
+    // Calculate total cost
+    const totalCost = parts.reduce((sum, part) => sum + part.total_cost, 0);
+    
+    return {
+      parts,
+      totalCost
+    };
+  } catch (error) {
+    console.error('Error calculating cabinet parts:', error);
+    throw error;
+  }
+};
+
+// Legacy calculation method for backward compatibility
+const legacyCalculateCabinetParts = async (cabinetData) => {
   const {
     model_id,
     width,
@@ -43,11 +284,8 @@ export const calculateCabinetParts = async (cabinetData) => {
     // Parts array to store all cabinet parts
     const parts = [];
     
-    // Calculate dimensions based on cabinet type
-    const categoryId = model.category_id;
-    
     // Get category name
-    const categories = await runQuery('SELECT name FROM cabinet_categories WHERE id = ?', [categoryId]);
+    const categories = await runQuery('SELECT name FROM cabinet_categories WHERE id = ?', [model.category_id]);
     const categoryName = categories[0]?.name || '';
     
     // Generate parts based on cabinet type
@@ -85,16 +323,46 @@ export const calculateCabinetParts = async (cabinetData) => {
   }
 };
 
-// Calculate cabinet cost
-export const calculateCabinetCost = async (cabinetData) => {
-  try {
-    const { parts, totalCost } = await calculateCabinetParts(cabinetData);
-    return totalCost;
-  } catch (error) {
-    console.error('Error calculating cabinet cost:', error);
-    throw error;
-  }
-};
+// Helper function to add a part to the parts array
+function addPart(parts, name, part_type, material_id, width, height, thickness, quantity,
+  edge_banding_top, edge_banding_bottom, edge_banding_left, edge_banding_right,
+  edge_material_id, notes, material_cost_per_unit, edge_cost_per_unit, grain_direction = 'no_grain') {
+  
+  // Calculate part area in square meters
+  const partArea = (width * height) / 1000000; // Convert from mm² to m²
+  
+  // Calculate edge banding length in meters
+  let edgeBandingLength = 0;
+  if (edge_banding_top) edgeBandingLength += width / 1000;
+  if (edge_banding_bottom) edgeBandingLength += width / 1000;
+  if (edge_banding_left) edgeBandingLength += height / 1000;
+  if (edge_banding_right) edgeBandingLength += height / 1000;
+  
+  // Calculate part cost
+  const panelCost = partArea * material_cost_per_unit;
+  const edgeCost = edgeBandingLength * edge_cost_per_unit;
+  const unitCost = panelCost + edgeCost;
+  const totalCost = unitCost * quantity;
+  
+  parts.push({
+    name,
+    part_type,
+    material_id,
+    width,
+    height,
+    thickness,
+    quantity,
+    edge_banding_top,
+    edge_banding_bottom,
+    edge_banding_left,
+    edge_banding_right,
+    edge_material_id,
+    notes,
+    unit_cost: unitCost,
+    total_cost: totalCost,
+    grain_direction
+  });
+}
 
 // Helper function to generate base cabinet parts
 function generateBaseCabinetParts(parts, width, height, depth, panelThickness, backThickness, 
@@ -450,46 +718,6 @@ function generateGenericCabinetParts(parts, width, height, depth, panelThickness
   addHardwareCosts(parts, hardware_config, hasTwoDoors);
 }
 
-// Helper function to add a part to the parts array
-function addPart(parts, name, part_type, material_id, width, height, thickness, quantity,
-  edge_banding_top, edge_banding_bottom, edge_banding_left, edge_banding_right,
-  edge_material_id, notes, material_cost_per_unit, edge_cost_per_unit) {
-  
-  // Calculate part area in square meters
-  const partArea = (width * height) / 1000000; // Convert from mm² to m²
-  
-  // Calculate edge banding length in meters
-  let edgeBandingLength = 0;
-  if (edge_banding_top) edgeBandingLength += width / 1000;
-  if (edge_banding_bottom) edgeBandingLength += width / 1000;
-  if (edge_banding_left) edgeBandingLength += height / 1000;
-  if (edge_banding_right) edgeBandingLength += height / 1000;
-  
-  // Calculate part cost
-  const panelCost = partArea * material_cost_per_unit;
-  const edgeCost = edgeBandingLength * edge_cost_per_unit;
-  const unitCost = panelCost + edgeCost;
-  const totalCost = unitCost * quantity;
-  
-  parts.push({
-    name,
-    part_type,
-    material_id,
-    width,
-    height,
-    thickness,
-    quantity,
-    edge_banding_top,
-    edge_banding_bottom,
-    edge_banding_left,
-    edge_banding_right,
-    edge_material_id,
-    notes,
-    unit_cost: unitCost,
-    total_cost: totalCost
-  });
-}
-
 // Add hardware costs to the parts array
 function addHardwareCosts(parts, hardware_config, hasTwoDoors, isTallCabinet = false) {
   // Default hardware quantities
@@ -592,3 +820,14 @@ function addHardwareCosts(parts, hardware_config, hasTwoDoors, isTallCabinet = f
     });
   }
 }
+
+// Calculate cabinet cost
+export const calculateCabinetCost = async (cabinetData) => {
+  try {
+    const { parts, totalCost } = await calculateCabinetParts(cabinetData);
+    return totalCost;
+  } catch (error) {
+    console.error('Error calculating cabinet cost:', error);
+    throw error;
+  }
+};

@@ -486,8 +486,8 @@ router.post('/projects/:id/items', async (req, res) => {
           project_id, project_item_id, name, part_type, material_id,
           width, height, thickness, quantity,
           edge_banding_top, edge_banding_bottom, edge_banding_left, edge_banding_right,
-          edge_material_id, notes, unit_cost, total_cost
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          edge_material_id, notes, unit_cost, total_cost, grain_direction
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         projectId,
         itemId,
@@ -505,7 +505,8 @@ router.post('/projects/:id/items', async (req, res) => {
         part.edge_material_id || null,
         part.notes || '',
         part.unit_cost,
-        part.total_cost
+        part.total_cost,
+        part.grain_direction || 'no_grain'
       ]);
     }
     
@@ -650,7 +651,8 @@ router.get('/projects/:id/cutting-optimization', async (req, res) => {
           name: part.name,
           width: part.width,
           height: part.height,
-          part_type: part.part_type
+          part_type: part.part_type,
+          grain_direction: part.grain_direction
         });
       }
     });
@@ -734,6 +736,519 @@ router.get('/projects/:id/cutting-optimization', async (req, res) => {
   } catch (error) {
     console.error('Error generating cutting optimization:', error);
     res.status(500).json({ error: 'Failed to generate cutting optimization' });
+  }
+});
+
+// Get all part types
+router.get('/part-types', async (req, res) => {
+  try {
+    const partTypes = await runQuery(`
+      SELECT * FROM part_types
+      ORDER BY name
+    `);
+    res.json(partTypes);
+  } catch (error) {
+    console.error('Error fetching part types:', error);
+    res.status(500).json({ error: 'Failed to fetch part types' });
+  }
+});
+
+// Get a specific part type
+router.get('/part-types/:id', async (req, res) => {
+  try {
+    const partTypeId = req.params.id;
+    
+    const partTypes = await runQuery(`
+      SELECT * FROM part_types
+      WHERE id = ?
+    `, [partTypeId]);
+    
+    if (partTypes.length === 0) {
+      return res.status(404).json({ error: 'Part type not found' });
+    }
+    
+    res.json(partTypes[0]);
+  } catch (error) {
+    console.error('Error fetching part type:', error);
+    res.status(500).json({ error: 'Failed to fetch part type' });
+  }
+});
+
+// Create a new part type
+router.post('/part-types', async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      default_formula_width,
+      default_formula_height,
+      default_thickness,
+      default_material_type,
+      default_edge_material_type,
+      is_standard_part
+    } = req.body;
+    
+    if (!name || !default_formula_width || !default_formula_height) {
+      return res.status(400).json({ error: 'Name, default width formula, and default height formula are required' });
+    }
+    
+    const result = await runStatement(`
+      INSERT INTO part_types (
+        name, description, default_formula_width, default_formula_height,
+        default_thickness, default_material_type, default_edge_material_type,
+        is_standard_part
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      name,
+      description || '',
+      default_formula_width,
+      default_formula_height,
+      default_thickness || 18,
+      default_material_type || 'panel',
+      default_edge_material_type || 'edge_banding',
+      is_standard_part !== undefined ? is_standard_part : 1
+    ]);
+    
+    await logAuditTrail('part_types', result.id, 'INSERT', null, req.body, req.user.id);
+    
+    res.status(201).json({
+      id: result.id,
+      message: 'Part type created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating part type:', error);
+    res.status(500).json({ error: 'Failed to create part type' });
+  }
+});
+
+// Update a part type
+router.put('/part-types/:id', async (req, res) => {
+  try {
+    const partTypeId = req.params.id;
+    const {
+      name,
+      description,
+      default_formula_width,
+      default_formula_height,
+      default_thickness,
+      default_material_type,
+      default_edge_material_type,
+      is_standard_part
+    } = req.body;
+    
+    // Check if part type exists
+    const existingPartTypes = await runQuery('SELECT * FROM part_types WHERE id = ?', [partTypeId]);
+    if (existingPartTypes.length === 0) {
+      return res.status(404).json({ error: 'Part type not found' });
+    }
+    
+    if (!name || !default_formula_width || !default_formula_height) {
+      return res.status(400).json({ error: 'Name, default width formula, and default height formula are required' });
+    }
+    
+    await runStatement(`
+      UPDATE part_types
+      SET name = ?, description = ?, default_formula_width = ?, default_formula_height = ?,
+          default_thickness = ?, default_material_type = ?, default_edge_material_type = ?,
+          is_standard_part = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [
+      name,
+      description || '',
+      default_formula_width,
+      default_formula_height,
+      default_thickness || 18,
+      default_material_type || 'panel',
+      default_edge_material_type || 'edge_banding',
+      is_standard_part !== undefined ? is_standard_part : 1,
+      partTypeId
+    ]);
+    
+    await logAuditTrail('part_types', partTypeId, 'UPDATE', existingPartTypes[0], req.body, req.user.id);
+    
+    res.json({
+      message: 'Part type updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating part type:', error);
+    res.status(500).json({ error: 'Failed to update part type' });
+  }
+});
+
+// Delete a part type
+router.delete('/part-types/:id', async (req, res) => {
+  try {
+    const partTypeId = req.params.id;
+    
+    // Check if part type exists
+    const existingPartTypes = await runQuery('SELECT * FROM part_types WHERE id = ?', [partTypeId]);
+    if (existingPartTypes.length === 0) {
+      return res.status(404).json({ error: 'Part type not found' });
+    }
+    
+    // Check if part type is used in any cabinet model
+    const usedInModels = await runQuery('SELECT COUNT(*) as count FROM cabinet_model_parts WHERE part_type_id = ?', [partTypeId]);
+    if (usedInModels[0].count > 0) {
+      return res.status(400).json({ error: 'Cannot delete part type that is used in cabinet models' });
+    }
+    
+    await runStatement('DELETE FROM part_types WHERE id = ?', [partTypeId]);
+    
+    await logAuditTrail('part_types', partTypeId, 'DELETE', existingPartTypes[0], null, req.user.id);
+    
+    res.json({
+      message: 'Part type deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting part type:', error);
+    res.status(500).json({ error: 'Failed to delete part type' });
+  }
+});
+
+// Get all parts for a cabinet model
+router.get('/models/:modelId/parts', async (req, res) => {
+  try {
+    const modelId = req.params.modelId;
+    
+    // Check if model exists
+    const models = await runQuery('SELECT * FROM cabinet_models WHERE id = ?', [modelId]);
+    if (models.length === 0) {
+      return res.status(404).json({ error: 'Cabinet model not found' });
+    }
+    
+    const modelParts = await runQuery(`
+      SELECT 
+        cmp.*,
+        pt.name as part_type_name,
+        pt.description as part_type_description,
+        pt.default_formula_width,
+        pt.default_formula_height,
+        pt.default_thickness,
+        pt.default_material_type,
+        pt.default_edge_material_type
+      FROM cabinet_model_parts cmp
+      JOIN part_types pt ON cmp.part_type_id = pt.id
+      WHERE cmp.model_id = ?
+      ORDER BY cmp.sort_order
+    `, [modelId]);
+    
+    res.json(modelParts);
+  } catch (error) {
+    console.error('Error fetching model parts:', error);
+    res.status(500).json({ error: 'Failed to fetch model parts' });
+  }
+});
+
+// Add a part to a cabinet model
+router.post('/models/:modelId/parts', async (req, res) => {
+  try {
+    const modelId = req.params.modelId;
+    const {
+      part_type_id,
+      quantity_formula,
+      custom_formula_width,
+      custom_formula_height,
+      default_edge_top,
+      default_edge_bottom,
+      default_edge_left,
+      default_edge_right,
+      sort_order
+    } = req.body;
+    
+    // Check if model exists
+    const models = await runQuery('SELECT * FROM cabinet_models WHERE id = ?', [modelId]);
+    if (models.length === 0) {
+      return res.status(404).json({ error: 'Cabinet model not found' });
+    }
+    
+    // Check if part type exists
+    const partTypes = await runQuery('SELECT * FROM part_types WHERE id = ?', [part_type_id]);
+    if (partTypes.length === 0) {
+      return res.status(404).json({ error: 'Part type not found' });
+    }
+    
+    // Check if this part type is already assigned to this model
+    const existingParts = await runQuery(
+      'SELECT * FROM cabinet_model_parts WHERE model_id = ? AND part_type_id = ?',
+      [modelId, part_type_id]
+    );
+    
+    if (existingParts.length > 0) {
+      return res.status(400).json({ error: 'This part type is already assigned to this model' });
+    }
+    
+    const result = await runStatement(`
+      INSERT INTO cabinet_model_parts (
+        model_id, part_type_id, quantity_formula, custom_formula_width,
+        custom_formula_height, default_edge_top, default_edge_bottom,
+        default_edge_left, default_edge_right, sort_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      modelId,
+      part_type_id,
+      quantity_formula || '1',
+      custom_formula_width || null,
+      custom_formula_height || null,
+      default_edge_top ? 1 : 0,
+      default_edge_bottom ? 1 : 0,
+      default_edge_left ? 1 : 0,
+      default_edge_right ? 1 : 0,
+      sort_order || 0
+    ]);
+    
+    await logAuditTrail('cabinet_model_parts', result.id, 'INSERT', null, req.body, req.user.id);
+    
+    res.status(201).json({
+      id: result.id,
+      message: 'Part added to model successfully'
+    });
+  } catch (error) {
+    console.error('Error adding part to model:', error);
+    res.status(500).json({ error: 'Failed to add part to model' });
+  }
+});
+
+// Update a model part
+router.put('/models/:modelId/parts/:partId', async (req, res) => {
+  try {
+    const modelId = req.params.modelId;
+    const partId = req.params.partId;
+    const {
+      quantity_formula,
+      custom_formula_width,
+      custom_formula_height,
+      default_edge_top,
+      default_edge_bottom,
+      default_edge_left,
+      default_edge_right,
+      sort_order
+    } = req.body;
+    
+    // Check if model part exists
+    const existingParts = await runQuery(
+      'SELECT * FROM cabinet_model_parts WHERE id = ? AND model_id = ?',
+      [partId, modelId]
+    );
+    
+    if (existingParts.length === 0) {
+      return res.status(404).json({ error: 'Model part not found' });
+    }
+    
+    await runStatement(`
+      UPDATE cabinet_model_parts
+      SET quantity_formula = ?, custom_formula_width = ?, custom_formula_height = ?,
+          default_edge_top = ?, default_edge_bottom = ?, default_edge_left = ?,
+          default_edge_right = ?, sort_order = ?
+      WHERE id = ?
+    `, [
+      quantity_formula || '1',
+      custom_formula_width || null,
+      custom_formula_height || null,
+      default_edge_top ? 1 : 0,
+      default_edge_bottom ? 1 : 0,
+      default_edge_left ? 1 : 0,
+      default_edge_right ? 1 : 0,
+      sort_order || 0,
+      partId
+    ]);
+    
+    await logAuditTrail('cabinet_model_parts', partId, 'UPDATE', existingParts[0], req.body, req.user.id);
+    
+    res.json({
+      message: 'Model part updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating model part:', error);
+    res.status(500).json({ error: 'Failed to update model part' });
+  }
+});
+
+// Delete a model part
+router.delete('/models/:modelId/parts/:partId', async (req, res) => {
+  try {
+    const modelId = req.params.modelId;
+    const partId = req.params.partId;
+    
+    // Check if model part exists
+    const existingParts = await runQuery(
+      'SELECT * FROM cabinet_model_parts WHERE id = ? AND model_id = ?',
+      [partId, modelId]
+    );
+    
+    if (existingParts.length === 0) {
+      return res.status(404).json({ error: 'Model part not found' });
+    }
+    
+    await runStatement('DELETE FROM cabinet_model_parts WHERE id = ?', [partId]);
+    
+    await logAuditTrail('cabinet_model_parts', partId, 'DELETE', existingParts[0], null, req.user.id);
+    
+    res.json({
+      message: 'Model part deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting model part:', error);
+    res.status(500).json({ error: 'Failed to delete model part' });
+  }
+});
+
+// Get all accessories
+router.get('/accessories', async (req, res) => {
+  try {
+    const { type } = req.query;
+    
+    let sql = `
+      SELECT a.*, s.name as supplier_name
+      FROM cabinet_accessories a
+      LEFT JOIN suppliers s ON a.supplier_id = s.id
+      WHERE a.is_active = 1
+    `;
+    
+    const params = [];
+    
+    if (type) {
+      sql += ` AND a.type = ?`;
+      params.push(type);
+    }
+    
+    sql += ` ORDER BY a.name`;
+    
+    const accessories = await runQuery(sql, params);
+    res.json(accessories);
+  } catch (error) {
+    console.error('Error fetching accessories:', error);
+    res.status(500).json({ error: 'Failed to fetch accessories' });
+  }
+});
+
+// Create a new accessory
+router.post('/accessories', async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      type,
+      unit_cost,
+      default_quantity_formula,
+      supplier_id,
+      is_active
+    } = req.body;
+    
+    if (!name || !type || unit_cost === undefined) {
+      return res.status(400).json({ error: 'Name, type, and unit cost are required' });
+    }
+    
+    const result = await runStatement(`
+      INSERT INTO cabinet_accessories (
+        name, description, type, unit_cost, default_quantity_formula,
+        supplier_id, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [
+      name,
+      description || '',
+      type,
+      unit_cost,
+      default_quantity_formula || '1',
+      supplier_id || null,
+      is_active !== undefined ? is_active : 1
+    ]);
+    
+    await logAuditTrail('cabinet_accessories', result.id, 'INSERT', null, req.body, req.user.id);
+    
+    res.status(201).json({
+      id: result.id,
+      message: 'Accessory created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating accessory:', error);
+    res.status(500).json({ error: 'Failed to create accessory' });
+  }
+});
+
+// Get all accessories for a cabinet model
+router.get('/models/:modelId/accessories', async (req, res) => {
+  try {
+    const modelId = req.params.modelId;
+    
+    // Check if model exists
+    const models = await runQuery('SELECT * FROM cabinet_models WHERE id = ?', [modelId]);
+    if (models.length === 0) {
+      return res.status(404).json({ error: 'Cabinet model not found' });
+    }
+    
+    const modelAccessories = await runQuery(`
+      SELECT 
+        cma.*,
+        ca.name as accessory_name,
+        ca.description as accessory_description,
+        ca.type as accessory_type,
+        ca.unit_cost,
+        ca.default_quantity_formula
+      FROM cabinet_model_accessories cma
+      JOIN cabinet_accessories ca ON cma.accessory_id = ca.id
+      WHERE cma.model_id = ?
+      ORDER BY ca.type, ca.name
+    `, [modelId]);
+    
+    res.json(modelAccessories);
+  } catch (error) {
+    console.error('Error fetching model accessories:', error);
+    res.status(500).json({ error: 'Failed to fetch model accessories' });
+  }
+});
+
+// Add an accessory to a cabinet model
+router.post('/models/:modelId/accessories', async (req, res) => {
+  try {
+    const modelId = req.params.modelId;
+    const {
+      accessory_id,
+      quantity_formula,
+      is_required
+    } = req.body;
+    
+    // Check if model exists
+    const models = await runQuery('SELECT * FROM cabinet_models WHERE id = ?', [modelId]);
+    if (models.length === 0) {
+      return res.status(404).json({ error: 'Cabinet model not found' });
+    }
+    
+    // Check if accessory exists
+    const accessories = await runQuery('SELECT * FROM cabinet_accessories WHERE id = ?', [accessory_id]);
+    if (accessories.length === 0) {
+      return res.status(404).json({ error: 'Accessory not found' });
+    }
+    
+    // Check if this accessory is already assigned to this model
+    const existingAccessories = await runQuery(
+      'SELECT * FROM cabinet_model_accessories WHERE model_id = ? AND accessory_id = ?',
+      [modelId, accessory_id]
+    );
+    
+    if (existingAccessories.length > 0) {
+      return res.status(400).json({ error: 'This accessory is already assigned to this model' });
+    }
+    
+    const result = await runStatement(`
+      INSERT INTO cabinet_model_accessories (
+        model_id, accessory_id, quantity_formula, is_required
+      ) VALUES (?, ?, ?, ?)
+    `, [
+      modelId,
+      accessory_id,
+      quantity_formula || null,
+      is_required !== undefined ? is_required : 1
+    ]);
+    
+    await logAuditTrail('cabinet_model_accessories', result.id, 'INSERT', null, req.body, req.user.id);
+    
+    res.status(201).json({
+      id: result.id,
+      message: 'Accessory added to model successfully'
+    });
+  } catch (error) {
+    console.error('Error adding accessory to model:', error);
+    res.status(500).json({ error: 'Failed to add accessory to model' });
   }
 });
 
