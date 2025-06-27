@@ -7,6 +7,7 @@ import Inventory from './components/Inventory/Inventory';
 import Requisitions from './components/Requisitions/Requisitions';
 import PurchaseOrders from './components/PurchaseOrders/PurchaseOrders';
 import Production from './components/Production/Production';
+import CabinetCatalog from './components/CabinetCatalog/CabinetCatalog';
 import UserManagement from './components/Users/UserManagement';
 import MasterDataManagement from './components/MasterData/MasterDataManagement';
 import ReportDashboard from './components/Reports/ReportDashboard';
@@ -40,6 +41,7 @@ function AppContent() {
             <Route path="/requisitions" element={<Requisitions />} />
             <Route path="/purchase-orders" element={<PurchaseOrders />} />
             <Route path="/production" element={<Production />} />
+            <Route path="/cabinet-catalog" element={<CabinetCatalog />} />
             <Route path="/master-data" element={<MasterDataManagement />} />
             <Route path="/users" element={<UserManagement />} />
             <Route path="/reports" element={<ReportDashboard />} />

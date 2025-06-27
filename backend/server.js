@@ -23,6 +23,7 @@ import bomRoutes from './routes/boms.js';
 import productionOrderRoutes from './routes/productionOrders.js';
 import backupRoutes from './routes/backup.js';
 import imagesRoutes from './routes/images.js';
+import cabinetCatalogRoutes from './routes/cabinetCatalog.js';
 import rateLimit from 'express-rate-limit';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -65,6 +66,7 @@ io.on('connection', (socket) => {
   socket.join('po_updates');
   socket.join('bom_updates');
   socket.join('production_updates');
+  socket.join('cabinet_updates');
   
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
@@ -87,6 +89,7 @@ app.use('/api/boms', bomRoutes);
 app.use('/api/production-orders', productionOrderRoutes);
 app.use('/api/backup', backupRoutes);
 app.use('/api/images', imagesRoutes);
+app.use('/api/cabinet-catalog', cabinetCatalogRoutes);
 
 // Serve static files - Always serve in this environment
 app.use(express.static(path.join(__dirname, '../dist')));

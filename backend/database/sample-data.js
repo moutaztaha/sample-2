@@ -4,6 +4,7 @@ import { addSampleBOMData } from './sample-data-bom.js';
 import { addSampleRequisitionsData } from './sample-data-requisitions.js';
 import { addSamplePurchaseOrdersData } from './sample-data-purchase-orders.js';
 import { addSampleProductionOrdersData } from './sample-data-production.js';
+import { addSampleCabinetData } from './sample-data-cabinets.js';
 
 // Function to add all sample data
 export const addAllSampleData = async () => {
@@ -12,5 +13,6 @@ export const addAllSampleData = async () => {
   await addSampleRequisitionsData();
   await addSamplePurchaseOrdersData();
   await addSampleProductionOrdersData();
+  await addSampleCabinetData();
   console.log('✅ All sample data added successfully!');
 };

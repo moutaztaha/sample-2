@@ -36,7 +36,11 @@
     "socket.io-client": "^4.7.4",
     "express-rate-limit": "^7.1.5",
     "validator": "^13.11.0",
-    "zxcvbn": "^4.4.2"
+    "zxcvbn": "^4.4.2",
+    "binpackingjs": "^2.3.2",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-colorful": "^5.6.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
