@@ -43,6 +43,9 @@ const CabinetConfigureModal: React.FC<CabinetConfigureModalProps> = ({
   const [error, setError] = useState('');
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [modelParts, setModelParts] = useState<any[]>([]);
+  const [modelAccessories, setModelAccessories] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'dimensions' | 'parts' | 'accessories'>('dimensions');
 
   useEffect(() => {
     if (isOpen && model) {
@@ -66,6 +69,10 @@ const CabinetConfigureModal: React.FC<CabinetConfigureModalProps> = ({
       // Load projects for dropdown
       loadProjects();
       
+      // Load model parts and accessories
+      loadModelParts();
+      loadModelAccessories();
+      
       // Calculate initial price
       calculateCabinet();
     }
@@ -77,6 +84,26 @@ const CabinetConfigureModal: React.FC<CabinetConfigureModalProps> = ({
       setProjects(data.projects || []);
     } catch (error) {
       console.error('Error loading projects:', error);
+    }
+  };
+
+  const loadModelParts = async () => {
+    try {
+      if (!model) return;
+      const parts = await cabinetService.getModelParts(model.id);
+      setModelParts(parts);
+    } catch (error) {
+      console.error('Error loading model parts:', error);
+    }
+  };
+
+  const loadModelAccessories = async () => {
+    try {
+      if (!model) return;
+      const accessories = await cabinetService.getModelAccessories(model.id);
+      setModelAccessories(accessories);
+    } catch (error) {
+      console.error('Error loading model accessories:', error);
     }
   };
 
@@ -116,6 +143,28 @@ const CabinetConfigureModal: React.FC<CabinetConfigureModalProps> = ({
     }));
   };
 
+  const handlePartChange = (partIndex: number, field: string, value: any) => {
+    setModelParts(prev => {
+      const updated = [...prev];
+      updated[partIndex] = {
+        ...updated[partIndex],
+        [field]: value
+      };
+      return updated;
+    });
+  };
+
+  const handleAccessoryChange = (accessoryIndex: number, field: string, value: any) => {
+    setModelAccessories(prev => {
+      const updated = [...prev];
+      updated[accessoryIndex] = {
+        ...updated[accessoryIndex],
+        [field]: value
+      };
+      return updated;
+    });
+  };
+
   const calculateCabinet = async () => {
     try {
       setCalculating(true);
@@ -137,7 +186,9 @@ const CabinetConfigureModal: React.FC<CabinetConfigureModalProps> = ({
         edge_material_id: formData.edge_material_id || null,
         back_material_id: formData.back_material_id || null,
         door_material_id: formData.door_material_id || null,
-        hardware_config: formData.hardware_config
+        hardware_config: formData.hardware_config,
+        model_parts: modelParts,
+        model_accessories: modelAccessories
       });
       
       setCalculationResult(result);
@@ -205,7 +256,9 @@ const CabinetConfigureModal: React.FC<CabinetConfigureModalProps> = ({
         edge_material_id: formData.edge_material_id || null,
         back_material_id: formData.back_material_id || null,
         door_material_id: formData.door_material_id || null,
-        hardware_config: formData.hardware_config
+        hardware_config: formData.hardware_config,
+        model_parts: modelParts,
+        model_accessories: modelAccessories
       });
       
       onSuccess();
@@ -244,6 +297,45 @@ const CabinetConfigureModal: React.FC<CabinetConfigureModalProps> = ({
           </button>
         </div>
 
+        {/* Tabs */}
+        <div className="border-b border-gray-200">
+          <nav className="flex space-x-8 px-6 overflow-x-auto" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab('dimensions')}
+              className={`${
+                activeTab === 'dimensions'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors`}
+            >
+              <Ruler className="h-5 w-5 mr-2" />
+              Dimensions
+            </button>
+            <button
+              onClick={() => setActiveTab('parts')}
+              className={`${
+                activeTab === 'parts'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors`}
+            >
+              <Package className="h-5 w-5 mr-2" />
+              Parts
+            </button>
+            <button
+              onClick={() => setActiveTab('accessories')}
+              className={`${
+                activeTab === 'accessories'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors`}
+            >
+              <Layers className="h-5 w-5 mr-2" />
+              Accessories
+            </button>
+          </nav>
+        </div>
+
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto min-h-0">
           <div className="p-4 sm:p-6 space-y-6">
@@ -268,323 +360,415 @@ const CabinetConfigureModal: React.FC<CabinetConfigureModalProps> = ({
                   />
                 </div>
 
-                {/* Dimensions */}
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Dimensions</h3>
-                  
-                  <div className="space-y-4">
-                    {/* Width */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Width (mm) - Min: {model.min_width}, Max: {model.max_width}
-                      </label>
-                      <div className="flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => handleDimensionChange('width', formData.width - 10)}
-                          className="p-2 bg-gray-100 rounded-l-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Minus className="h-4 w-4 text-gray-600" />
-                        </button>
-                        <input
-                          type="number"
-                          name="width"
-                          value={formData.width}
-                          onChange={(e) => handleDimensionChange('width', parseInt(e.target.value) || 0)}
-                          min={model.min_width}
-                          max={model.max_width}
-                          className="flex-1 px-3 py-2 border-y border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleDimensionChange('width', formData.width + 10)}
-                          className="p-2 bg-gray-100 rounded-r-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Plus className="h-4 w-4 text-gray-600" />
-                        </button>
+                {activeTab === 'dimensions' && (
+                  <>
+                    {/* Dimensions */}
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">Dimensions</h3>
+                      
+                      <div className="space-y-4">
+                        {/* Width */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Width (mm) - Min: {model.min_width}, Max: {model.max_width}
+                          </label>
+                          <div className="flex items-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDimensionChange('width', formData.width - 10)}
+                              className="p-2 bg-gray-100 rounded-l-lg hover:bg-gray-200 transition-colors"
+                            >
+                              <Minus className="h-4 w-4 text-gray-600" />
+                            </button>
+                            <input
+                              type="number"
+                              name="width"
+                              value={formData.width}
+                              onChange={(e) => handleDimensionChange('width', parseInt(e.target.value) || 0)}
+                              min={model.min_width}
+                              max={model.max_width}
+                              className="flex-1 px-3 py-2 border-y border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleDimensionChange('width', formData.width + 10)}
+                              className="p-2 bg-gray-100 rounded-r-lg hover:bg-gray-200 transition-colors"
+                            >
+                              <Plus className="h-4 w-4 text-gray-600" />
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Height */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Height (mm) - Min: {model.min_height}, Max: {model.max_height}
+                          </label>
+                          <div className="flex items-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDimensionChange('height', formData.height - 10)}
+                              className="p-2 bg-gray-100 rounded-l-lg hover:bg-gray-200 transition-colors"
+                            >
+                              <Minus className="h-4 w-4 text-gray-600" />
+                            </button>
+                            <input
+                              type="number"
+                              name="height"
+                              value={formData.height}
+                              onChange={(e) => handleDimensionChange('height', parseInt(e.target.value) || 0)}
+                              min={model.min_height}
+                              max={model.max_height}
+                              className="flex-1 px-3 py-2 border-y border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleDimensionChange('height', formData.height + 10)}
+                              className="p-2 bg-gray-100 rounded-r-lg hover:bg-gray-200 transition-colors"
+                            >
+                              <Plus className="h-4 w-4 text-gray-600" />
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Depth */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Depth (mm) - Min: {model.min_depth}, Max: {model.max_depth}
+                          </label>
+                          <div className="flex items-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDimensionChange('depth', formData.depth - 10)}
+                              className="p-2 bg-gray-100 rounded-l-lg hover:bg-gray-200 transition-colors"
+                            >
+                              <Minus className="h-4 w-4 text-gray-600" />
+                            </button>
+                            <input
+                              type="number"
+                              name="depth"
+                              value={formData.depth}
+                              onChange={(e) => handleDimensionChange('depth', parseInt(e.target.value) || 0)}
+                              min={model.min_depth}
+                              max={model.max_depth}
+                              className="flex-1 px-3 py-2 border-y border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleDimensionChange('depth', formData.depth + 10)}
+                              className="p-2 bg-gray-100 rounded-r-lg hover:bg-gray-200 transition-colors"
+                            >
+                              <Plus className="h-4 w-4 text-gray-600" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    
-                    {/* Height */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Height (mm) - Min: {model.min_height}, Max: {model.max_height}
-                      </label>
-                      <div className="flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => handleDimensionChange('height', formData.height - 10)}
-                          className="p-2 bg-gray-100 rounded-l-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Minus className="h-4 w-4 text-gray-600" />
-                        </button>
-                        <input
-                          type="number"
-                          name="height"
-                          value={formData.height}
-                          onChange={(e) => handleDimensionChange('height', parseInt(e.target.value) || 0)}
-                          min={model.min_height}
-                          max={model.max_height}
-                          className="flex-1 px-3 py-2 border-y border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleDimensionChange('height', formData.height + 10)}
-                          className="p-2 bg-gray-100 rounded-r-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Plus className="h-4 w-4 text-gray-600" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Depth */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Depth (mm) - Min: {model.min_depth}, Max: {model.max_depth}
-                      </label>
-                      <div className="flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => handleDimensionChange('depth', formData.depth - 10)}
-                          className="p-2 bg-gray-100 rounded-l-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Minus className="h-4 w-4 text-gray-600" />
-                        </button>
-                        <input
-                          type="number"
-                          name="depth"
-                          value={formData.depth}
-                          onChange={(e) => handleDimensionChange('depth', parseInt(e.target.value) || 0)}
-                          min={model.min_depth}
-                          max={model.max_depth}
-                          className="flex-1 px-3 py-2 border-y border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleDimensionChange('depth', formData.depth + 10)}
-                          className="p-2 bg-gray-100 rounded-r-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Plus className="h-4 w-4 text-gray-600" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Materials */}
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Materials</h3>
-                  
-                  <div className="space-y-4">
-                    {/* Panel Material */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Panel Material
-                      </label>
-                      <select
-                        name="panel_material_id"
-                        value={formData.panel_material_id}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Select Panel Material</option>
-                        {panelMaterials.map(material => (
-                          <option key={material.id} value={material.id}>
-                            {material.name} - ${material.cost_per_unit.toFixed(2)}/{material.unit}
-                          </option>
-                        ))}
-                      </select>
+                    {/* Materials */}
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">Materials</h3>
+                      
+                      <div className="space-y-4">
+                        {/* Panel Material */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Panel Material
+                          </label>
+                          <select
+                            name="panel_material_id"
+                            value={formData.panel_material_id}
+                            onChange={handleInputChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="">Select Panel Material</option>
+                            {panelMaterials.map(material => (
+                              <option key={material.id} value={material.id}>
+                                {material.name} - ${material.cost_per_unit.toFixed(2)}/{material.unit}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        {/* Edge Banding Material */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Edge Banding Material
+                          </label>
+                          <select
+                            name="edge_material_id"
+                            value={formData.edge_material_id}
+                            onChange={handleInputChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="">Select Edge Banding</option>
+                            {edgeMaterials.map(material => (
+                              <option key={material.id} value={material.id}>
+                                {material.name} - ${material.cost_per_unit.toFixed(2)}/{material.unit}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        {/* Back Panel Material */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Back Panel Material
+                          </label>
+                          <select
+                            name="back_material_id"
+                            value={formData.back_material_id}
+                            onChange={handleInputChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="">Select Back Panel Material</option>
+                            {backMaterials.map(material => (
+                              <option key={material.id} value={material.id}>
+                                {material.name} - ${material.cost_per_unit.toFixed(2)}/{material.unit}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        {/* Door Material (can be same as panel) */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Door Material
+                          </label>
+                          <select
+                            name="door_material_id"
+                            value={formData.door_material_id}
+                            onChange={handleInputChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="">Same as Panel Material</option>
+                            {panelMaterials.map(material => (
+                              <option key={material.id} value={material.id}>
+                                {material.name} - ${material.cost_per_unit.toFixed(2)}/{material.unit}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </div>
-                    
-                    {/* Edge Banding Material */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Edge Banding Material
-                      </label>
-                      <select
-                        name="edge_material_id"
-                        value={formData.edge_material_id}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Select Edge Banding</option>
-                        {edgeMaterials.map(material => (
-                          <option key={material.id} value={material.id}>
-                            {material.name} - ${material.cost_per_unit.toFixed(2)}/{material.unit}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    {/* Back Panel Material */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Back Panel Material
-                      </label>
-                      <select
-                        name="back_material_id"
-                        value={formData.back_material_id}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Select Back Panel Material</option>
-                        {backMaterials.map(material => (
-                          <option key={material.id} value={material.id}>
-                            {material.name} - ${material.cost_per_unit.toFixed(2)}/{material.unit}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    {/* Door Material (can be same as panel) */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Door Material
-                      </label>
-                      <select
-                        name="door_material_id"
-                        value={formData.door_material_id}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Same as Panel Material</option>
-                        {panelMaterials.map(material => (
-                          <option key={material.id} value={material.id}>
-                            {material.name} - ${material.cost_per_unit.toFixed(2)}/{material.unit}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
+                  </>
+                )}
 
-                {/* Hardware */}
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Hardware</h3>
-                  
-                  <div className="space-y-4">
-                    {/* Hinges */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Hinges
-                      </label>
-                      <div className="flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => handleHardwareChange('hinges', Math.max(0, formData.hardware_config.hinges - 1))}
-                          className="p-2 bg-gray-100 rounded-l-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Minus className="h-4 w-4 text-gray-600" />
-                        </button>
-                        <input
-                          type="number"
-                          value={formData.hardware_config.hinges}
-                          onChange={(e) => handleHardwareChange('hinges', parseInt(e.target.value) || 0)}
-                          min="0"
-                          className="flex-1 px-3 py-2 border-y border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleHardwareChange('hinges', formData.hardware_config.hinges + 1)}
-                          className="p-2 bg-gray-100 rounded-r-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Plus className="h-4 w-4 text-gray-600" />
-                        </button>
-                      </div>
-                    </div>
+                {activeTab === 'parts' && (
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Cabinet Parts</h3>
                     
-                    {/* Handles */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Handles
-                      </label>
-                      <div className="flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => handleHardwareChange('handles', Math.max(0, formData.hardware_config.handles - 1))}
-                          className="p-2 bg-gray-100 rounded-l-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Minus className="h-4 w-4 text-gray-600" />
-                        </button>
-                        <input
-                          type="number"
-                          value={formData.hardware_config.handles}
-                          onChange={(e) => handleHardwareChange('handles', parseInt(e.target.value) || 0)}
-                          min="0"
-                          className="flex-1 px-3 py-2 border-y border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleHardwareChange('handles', formData.hardware_config.handles + 1)}
-                          className="p-2 bg-gray-100 rounded-r-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Plus className="h-4 w-4 text-gray-600" />
-                        </button>
+                    {modelParts.length === 0 ? (
+                      <p className="text-gray-500 text-center py-4">No parts defined for this cabinet model</p>
+                    ) : (
+                      <div className="space-y-6">
+                        {modelParts.map((part, index) => (
+                          <div key={index} className="border border-gray-200 p-4 rounded-lg">
+                            <div className="flex justify-between items-center mb-3">
+                              <h4 className="font-medium text-gray-900">{part.part_type_name}</h4>
+                              <span className="text-sm text-gray-500">{part.part_type_description}</span>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Quantity Formula
+                                </label>
+                                <input
+                                  type="text"
+                                  value={part.quantity_formula}
+                                  onChange={(e) => handlePartChange(index, 'quantity_formula', e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Thickness (mm)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={part.default_thickness}
+                                  onChange={(e) => handlePartChange(index, 'default_thickness', parseInt(e.target.value))}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Width Formula
+                                </label>
+                                <input
+                                  type="text"
+                                  value={part.custom_formula_width || part.default_formula_width}
+                                  onChange={(e) => handlePartChange(index, 'custom_formula_width', e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Height Formula
+                                </label>
+                                <input
+                                  type="text"
+                                  value={part.custom_formula_height || part.default_formula_height}
+                                  onChange={(e) => handlePartChange(index, 'custom_formula_height', e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="mb-3">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Grain Direction
+                              </label>
+                              <div className="flex space-x-4">
+                                <label className="inline-flex items-center">
+                                  <input
+                                    type="radio"
+                                    name={`grain_${index}`}
+                                    value="with_grain"
+                                    checked={part.grain_direction === 'with_grain'}
+                                    onChange={() => handlePartChange(index, 'grain_direction', 'with_grain')}
+                                    className="form-radio h-4 w-4 text-blue-600"
+                                  />
+                                  <span className="ml-2 text-sm text-gray-700">With Grain</span>
+                                </label>
+                                <label className="inline-flex items-center">
+                                  <input
+                                    type="radio"
+                                    name={`grain_${index}`}
+                                    value="against_grain"
+                                    checked={part.grain_direction === 'against_grain'}
+                                    onChange={() => handlePartChange(index, 'grain_direction', 'against_grain')}
+                                    className="form-radio h-4 w-4 text-blue-600"
+                                  />
+                                  <span className="ml-2 text-sm text-gray-700">Against Grain</span>
+                                </label>
+                                <label className="inline-flex items-center">
+                                  <input
+                                    type="radio"
+                                    name={`grain_${index}`}
+                                    value="no_grain"
+                                    checked={part.grain_direction === 'no_grain'}
+                                    onChange={() => handlePartChange(index, 'grain_direction', 'no_grain')}
+                                    className="form-radio h-4 w-4 text-blue-600"
+                                  />
+                                  <span className="ml-2 text-sm text-gray-700">No Grain</span>
+                                </label>
+                              </div>
+                            </div>
+                            
+                            <div className="mb-3">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Edge Banding
+                              </label>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <label className="inline-flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={part.default_edge_top}
+                                    onChange={(e) => handlePartChange(index, 'default_edge_top', e.target.checked)}
+                                    className="form-checkbox h-4 w-4 text-blue-600"
+                                  />
+                                  <span className="ml-2 text-sm text-gray-700">Top</span>
+                                </label>
+                                <label className="inline-flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={part.default_edge_bottom}
+                                    onChange={(e) => handlePartChange(index, 'default_edge_bottom', e.target.checked)}
+                                    className="form-checkbox h-4 w-4 text-blue-600"
+                                  />
+                                  <span className="ml-2 text-sm text-gray-700">Bottom</span>
+                                </label>
+                                <label className="inline-flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={part.default_edge_left}
+                                    onChange={(e) => handlePartChange(index, 'default_edge_left', e.target.checked)}
+                                    className="form-checkbox h-4 w-4 text-blue-600"
+                                  />
+                                  <span className="ml-2 text-sm text-gray-700">Left</span>
+                                </label>
+                                <label className="inline-flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={part.default_edge_right}
+                                    onChange={(e) => handlePartChange(index, 'default_edge_right', e.target.checked)}
+                                    className="form-checkbox h-4 w-4 text-blue-600"
+                                  />
+                                  <span className="ml-2 text-sm text-gray-700">Right</span>
+                                </label>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                    
-                    {/* Shelf Pins */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Shelf Support Pins
-                      </label>
-                      <div className="flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => handleHardwareChange('shelf_pins', Math.max(0, formData.hardware_config.shelf_pins - 4))}
-                          className="p-2 bg-gray-100 rounded-l-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Minus className="h-4 w-4 text-gray-600" />
-                        </button>
-                        <input
-                          type="number"
-                          value={formData.hardware_config.shelf_pins}
-                          onChange={(e) => handleHardwareChange('shelf_pins', parseInt(e.target.value) || 0)}
-                          min="0"
-                          step="4"
-                          className="flex-1 px-3 py-2 border-y border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleHardwareChange('shelf_pins', formData.hardware_config.shelf_pins + 4)}
-                          className="p-2 bg-gray-100 rounded-r-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Plus className="h-4 w-4 text-gray-600" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Drawer Slides */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Drawer Slides (pairs)
-                      </label>
-                      <div className="flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => handleHardwareChange('drawer_slides', Math.max(0, formData.hardware_config.drawer_slides - 1))}
-                          className="p-2 bg-gray-100 rounded-l-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Minus className="h-4 w-4 text-gray-600" />
-                        </button>
-                        <input
-                          type="number"
-                          value={formData.hardware_config.drawer_slides}
-                          onChange={(e) => handleHardwareChange('drawer_slides', parseInt(e.target.value) || 0)}
-                          min="0"
-                          className="flex-1 px-3 py-2 border-y border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleHardwareChange('drawer_slides', formData.hardware_config.drawer_slides + 1)}
-                          className="p-2 bg-gray-100 rounded-r-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Plus className="h-4 w-4 text-gray-600" />
-                        </button>
-                      </div>
-                    </div>
+                    )}
                   </div>
-                </div>
+                )}
+
+                {activeTab === 'accessories' && (
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Cabinet Accessories</h3>
+                    
+                    {modelAccessories.length === 0 ? (
+                      <p className="text-gray-500 text-center py-4">No accessories defined for this cabinet model</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {modelAccessories.map((accessory, index) => (
+                          <div key={index} className="border border-gray-200 p-4 rounded-lg">
+                            <div className="flex justify-between items-center mb-3">
+                              <h4 className="font-medium text-gray-900">{accessory.accessory_name}</h4>
+                              <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
+                                {accessory.accessory_type}
+                              </span>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Quantity Formula
+                                </label>
+                                <input
+                                  type="text"
+                                  value={accessory.quantity_formula || accessory.default_quantity_formula}
+                                  onChange={(e) => handleAccessoryChange(index, 'quantity_formula', e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Unit Cost
+                                </label>
+                                <div className="px-3 py-2 bg-gray-100 rounded-lg text-sm">
+                                  ${accessory.unit_cost?.toFixed(2) || '0.00'}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-2">
+                              <label className="inline-flex items-center">
+                                <input
+                                  type="checkbox"
+                                  checked={accessory.is_required}
+                                  onChange={(e) => handleAccessoryChange(index, 'is_required', e.target.checked)}
+                                  className="form-checkbox h-4 w-4 text-blue-600"
+                                />
+                                <span className="ml-2 text-sm text-gray-700">Required</span>
+                              </label>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Right Column - Results */}

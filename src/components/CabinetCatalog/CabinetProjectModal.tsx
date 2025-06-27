@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Package, Ruler, DollarSign, Plus, Minus, Trash2, Download } from 'lucide-react';
+import { X, Save, Package, Ruler, DollarSign, Plus, Minus, Trash2, Download, Scissors } from 'lucide-react';
 import { cabinetService } from '../../services/cabinetService';
 
 interface CabinetProjectModalProps {
@@ -35,6 +35,13 @@ const CabinetProjectModal: React.FC<CabinetProjectModalProps> = ({
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'details' | 'cabinets' | 'parts'>('details');
   const [isNewProject, setIsNewProject] = useState(true);
+  const [showAddCabinetModal, setShowAddCabinetModal] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [cabinetDimensions, setCabinetDimensions] = useState({
+    width: 0,
+    height: 0,
+    depth: 0
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -126,6 +133,151 @@ const CabinetProjectModal: React.FC<CabinetProjectModalProps> = ({
   const handleExportCostEstimate = () => {
     // This would generate and download a cost estimate
     console.log('Export cost estimate for project:', project.id);
+  };
+
+  const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const modelId = e.target.value;
+    setSelectedModel(modelId);
+    
+    // Set default dimensions based on selected model
+    if (modelId) {
+      const model = models.find(m => m.id.toString() === modelId);
+      if (model) {
+        setCabinetDimensions({
+          width: model.default_width,
+          height: model.default_height,
+          depth: model.default_depth
+        });
+      }
+    }
+  };
+
+  const handleDimensionChange = (dimension: string, value: number) => {
+    setCabinetDimensions(prev => ({
+      ...prev,
+      [dimension]: value
+    }));
+  };
+
+  const handleAddCabinet = async () => {
+    try {
+      if (!selectedModel) {
+        setError('Please select a cabinet model');
+        return;
+      }
+      
+      if (!project || !project.id) {
+        setError('Please save the project first');
+        return;
+      }
+      
+      setLoading(true);
+      
+      const model = models.find(m => m.id.toString() === selectedModel);
+      if (!model) {
+        setError('Selected model not found');
+        setLoading(false);
+        return;
+      }
+      
+      // Validate dimensions
+      if (cabinetDimensions.width < model.min_width || cabinetDimensions.width > model.max_width) {
+        setError(`Width must be between ${model.min_width}mm and ${model.max_width}mm`);
+        setLoading(false);
+        return;
+      }
+      
+      if (cabinetDimensions.height < model.min_height || cabinetDimensions.height > model.max_height) {
+        setError(`Height must be between ${model.min_height}mm and ${model.max_height}mm`);
+        setLoading(false);
+        return;
+      }
+      
+      if (cabinetDimensions.depth < model.min_depth || cabinetDimensions.depth > model.max_depth) {
+        setError(`Depth must be between ${model.min_depth}mm and ${model.max_depth}mm`);
+        setLoading(false);
+        return;
+      }
+      
+      // Add cabinet to project
+      await cabinetService.addCabinetToProject(project.id, {
+        model_id: parseInt(selectedModel),
+        name: `${model.name} ${cabinetDimensions.width}x${cabinetDimensions.height}x${cabinetDimensions.depth}mm`,
+        width: cabinetDimensions.width,
+        height: cabinetDimensions.height,
+        depth: cabinetDimensions.depth,
+        quantity: 1
+      });
+      
+      // Reload project details
+      await loadProjectDetails();
+      
+      // Reset form
+      setSelectedModel('');
+      setShowAddCabinetModal(false);
+      
+    } catch (error) {
+      console.error('Error adding cabinet:', error);
+      setError(error instanceof Error ? error.message : 'Failed to add cabinet');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveCabinet = async (cabinetId: number) => {
+    try {
+      if (!project || !project.id) {
+        setError('Project not found');
+        return;
+      }
+      
+      if (!confirm('Are you sure you want to remove this cabinet?')) {
+        return;
+      }
+      
+      setLoading(true);
+      
+      // This would call an API to remove the cabinet
+      // await cabinetService.removeCabinetFromProject(project.id, cabinetId);
+      
+      // For now, just update the UI
+      setProjectItems(prev => prev.filter(item => item.id !== cabinetId));
+      
+    } catch (error) {
+      console.error('Error removing cabinet:', error);
+      setError(error instanceof Error ? error.message : 'Failed to remove cabinet');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateCabinetQuantity = async (cabinetId: number, newQuantity: number) => {
+    try {
+      if (!project || !project.id) {
+        setError('Project not found');
+        return;
+      }
+      
+      if (newQuantity < 1) {
+        return;
+      }
+      
+      setLoading(true);
+      
+      // This would call an API to update the cabinet quantity
+      // await cabinetService.updateCabinetQuantity(project.id, cabinetId, newQuantity);
+      
+      // For now, just update the UI
+      setProjectItems(prev => prev.map(item => 
+        item.id === cabinetId ? { ...item, quantity: newQuantity, total_cost: item.unit_cost * newQuantity } : item
+      ));
+      
+    } catch (error) {
+      console.error('Error updating cabinet quantity:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update cabinet quantity');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -355,6 +507,96 @@ const CabinetProjectModal: React.FC<CabinetProjectModalProps> = ({
                   </div>
                 ) : (
                   <>
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium text-gray-900">Project Cabinets</h3>
+                      <button
+                        onClick={() => setShowAddCabinetModal(true)}
+                        className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Cabinet
+                      </button>
+                    </div>
+                    
+                    {showAddCabinetModal && (
+                      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <h4 className="text-md font-medium text-gray-900 mb-4">Add Cabinet to Project</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Cabinet Model *
+                            </label>
+                            <select
+                              value={selectedModel}
+                              onChange={handleModelChange}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                              <option value="">Select Cabinet Model</option>
+                              {models.map(model => (
+                                <option key={model.id} value={model.id}>
+                                  {model.name} ({model.category_name})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          
+                          {selectedModel && (
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Width (mm)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={cabinetDimensions.width}
+                                  onChange={(e) => handleDimensionChange('width', parseInt(e.target.value))}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Height (mm)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={cabinetDimensions.height}
+                                  onChange={(e) => handleDimensionChange('height', parseInt(e.target.value))}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Depth (mm)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={cabinetDimensions.depth}
+                                  onChange={(e) => handleDimensionChange('depth', parseInt(e.target.value))}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => setShowAddCabinetModal(false)}
+                            className="px-3 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleAddCabinet}
+                            disabled={!selectedModel || loading}
+                            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {loading ? 'Adding...' : 'Add Cabinet'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
                     {projectItems.length === 0 ? (
                       <div className="text-center py-12">
                         <Package className="mx-auto h-12 w-12 text-gray-400" />
@@ -366,7 +608,7 @@ const CabinetProjectModal: React.FC<CabinetProjectModalProps> = ({
                     ) : (
                       <div className="space-y-4">
                         {projectItems.map(item => (
-                          <div key={item.id} className="bg-white p-4 rounded-lg border border-gray-200">
+                          <div key={item.id} className="bg-white p-4 rounded-lg shadow-sm border">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                               <div className="flex items-center">
                                 <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center mr-4">
@@ -395,6 +637,7 @@ const CabinetProjectModal: React.FC<CabinetProjectModalProps> = ({
                                 <div className="flex items-center">
                                   <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
                                     <button
+                                      onClick={() => handleUpdateCabinetQuantity(item.id, item.quantity - 1)}
                                       className="px-3 py-2 bg-gray-100 hover:bg-gray-200 transition-colors"
                                     >
                                       <Minus className="h-4 w-4 text-gray-600" />
@@ -403,12 +646,14 @@ const CabinetProjectModal: React.FC<CabinetProjectModalProps> = ({
                                       {item.quantity}
                                     </div>
                                     <button
+                                      onClick={() => handleUpdateCabinetQuantity(item.id, item.quantity + 1)}
                                       className="px-3 py-2 bg-gray-100 hover:bg-gray-200 transition-colors"
                                     >
                                       <Plus className="h-4 w-4 text-gray-600" />
                                     </button>
                                   </div>
                                   <button
+                                    onClick={() => handleRemoveCabinet(item.id)}
                                     className="ml-2 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                   >
                                     <Trash2 className="h-5 w-5" />
@@ -463,6 +708,17 @@ const CabinetProjectModal: React.FC<CabinetProjectModalProps> = ({
                   </div>
                 ) : (
                   <>
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium text-gray-900">Parts List</h3>
+                      <button
+                        onClick={handleExportCuttingList}
+                        className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        <Scissors className="h-4 w-4 mr-2" />
+                        Generate Cutting List
+                      </button>
+                    </div>
+                    
                     {projectItems.length === 0 ? (
                       <div className="text-center py-12">
                         <Package className="mx-auto h-12 w-12 text-gray-400" />
@@ -482,6 +738,8 @@ const CabinetProjectModal: React.FC<CabinetProjectModalProps> = ({
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dimensions (mm)</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grain</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Edges</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
                                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cost</th>
                               </tr>
@@ -500,6 +758,18 @@ const CabinetProjectModal: React.FC<CabinetProjectModalProps> = ({
                                       {part.part_type === 'hardware' 
                                         ? 'N/A' 
                                         : `${part.width} × ${part.height} × ${part.thickness}`}
+                                    </td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                      {part.grain_direction === 'with_grain' ? 'With' : 
+                                       part.grain_direction === 'against_grain' ? 'Against' : 'None'}
+                                    </td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                      {[
+                                        part.edge_banding_top ? 'T' : '',
+                                        part.edge_banding_bottom ? 'B' : '',
+                                        part.edge_banding_left ? 'L' : '',
+                                        part.edge_banding_right ? 'R' : ''
+                                      ].filter(Boolean).join(', ') || 'None'}
                                     </td>
                                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{part.quantity}</td>
                                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 text-right">${part.total_cost.toFixed(2)}</td>

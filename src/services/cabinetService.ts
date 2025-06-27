@@ -179,5 +179,155 @@ export const cabinetService = {
     });
 
     return handleResponse(response);
+  },
+
+  // New methods for part types and model parts
+  async getPartTypes() {
+    try {
+      const response = await fetch(`${API_BASE}/cabinet-catalog/part-types`, {
+        headers: getAuthHeaders(),
+      });
+
+      const result = await handleResponse(response);
+      return Array.isArray(result) ? result : [];
+    } catch (error) {
+      console.error('Error fetching part types:', error);
+      return [];
+    }
+  },
+
+  async getPartType(id: number) {
+    try {
+      const response = await fetch(`${API_BASE}/cabinet-catalog/part-types/${id}`, {
+        headers: getAuthHeaders(),
+      });
+
+      return handleResponse(response);
+    } catch (error) {
+      console.error('Error fetching part type:', error);
+      return null;
+    }
+  },
+
+  async createPartType(partTypeData: any) {
+    const response = await fetch(`${API_BASE}/cabinet-catalog/part-types`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(partTypeData),
+    });
+
+    return handleResponse(response);
+  },
+
+  async updatePartType(id: number, partTypeData: any) {
+    const response = await fetch(`${API_BASE}/cabinet-catalog/part-types/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(partTypeData),
+    });
+
+    return handleResponse(response);
+  },
+
+  async deletePartType(id: number) {
+    const response = await fetch(`${API_BASE}/cabinet-catalog/part-types/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+
+    return handleResponse(response);
+  },
+
+  async getModelParts(modelId: number) {
+    try {
+      const response = await fetch(`${API_BASE}/cabinet-catalog/models/${modelId}/parts`, {
+        headers: getAuthHeaders(),
+      });
+
+      const result = await handleResponse(response);
+      return Array.isArray(result) ? result : [];
+    } catch (error) {
+      console.error('Error fetching model parts:', error);
+      return [];
+    }
+  },
+
+  async addPartToModel(modelId: number, partData: any) {
+    const response = await fetch(`${API_BASE}/cabinet-catalog/models/${modelId}/parts`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(partData),
+    });
+
+    return handleResponse(response);
+  },
+
+  async updateModelPart(modelId: number, partId: number, partData: any) {
+    const response = await fetch(`${API_BASE}/cabinet-catalog/models/${modelId}/parts/${partId}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(partData),
+    });
+
+    return handleResponse(response);
+  },
+
+  async deleteModelPart(modelId: number, partId: number) {
+    const response = await fetch(`${API_BASE}/cabinet-catalog/models/${modelId}/parts/${partId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+
+    return handleResponse(response);
+  },
+
+  // Accessories methods
+  async getAccessories(type?: string) {
+    try {
+      const queryParams = type ? `?type=${type}` : '';
+      const response = await fetch(`${API_BASE}/cabinet-catalog/accessories${queryParams}`, {
+        headers: getAuthHeaders(),
+      });
+
+      const result = await handleResponse(response);
+      return Array.isArray(result) ? result : [];
+    } catch (error) {
+      console.error('Error fetching accessories:', error);
+      return [];
+    }
+  },
+
+  async createAccessory(accessoryData: any) {
+    const response = await fetch(`${API_BASE}/cabinet-catalog/accessories`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(accessoryData),
+    });
+
+    return handleResponse(response);
+  },
+
+  async getModelAccessories(modelId: number) {
+    try {
+      const response = await fetch(`${API_BASE}/cabinet-catalog/models/${modelId}/accessories`, {
+        headers: getAuthHeaders(),
+      });
+
+      const result = await handleResponse(response);
+      return Array.isArray(result) ? result : [];
+    } catch (error) {
+      console.error('Error fetching model accessories:', error);
+      return [];
+    }
+  },
+
+  async addAccessoryToModel(modelId: number, accessoryData: any) {
+    const response = await fetch(`${API_BASE}/cabinet-catalog/models/${modelId}/accessories`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(accessoryData),
+    });
+
+    return handleResponse(response);
   }
 };
