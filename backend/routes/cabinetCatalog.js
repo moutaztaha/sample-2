@@ -325,6 +325,58 @@ router.post('/projects', async (req, res) => {
   }
 });
 
+// Update an existing cabinet project
+router.put('/projects/:id', async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const {
+      name,
+      description,
+      customer_name,
+      customer_email,
+      customer_phone,
+      status
+    } = req.body;
+    
+    // Check if project exists
+    const existingProjects = await runQuery('SELECT * FROM cabinet_projects WHERE id = ?', [projectId]);
+    if (existingProjects.length === 0) {
+      return res.status(404).json({ error: 'Cabinet project not found' });
+    }
+    
+    const existingProject = existingProjects[0];
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Project name is required' });
+    }
+    
+    // Update project
+    await runStatement(`
+      UPDATE cabinet_projects 
+      SET name = ?, description = ?, customer_name = ?, customer_email = ?, 
+          customer_phone = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [
+      name,
+      description || '',
+      customer_name || '',
+      customer_email || '',
+      customer_phone || '',
+      status || existingProject.status,
+      projectId
+    ]);
+    
+    await logAuditTrail('cabinet_projects', projectId, 'UPDATE', existingProject, req.body, req.user.id);
+    
+    res.json({
+      message: 'Cabinet project updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating cabinet project:', error);
+    res.status(500).json({ error: 'Failed to update cabinet project' });
+  }
+});
+
 // Add a cabinet to a project
 router.post('/projects/:id/items', async (req, res) => {
   try {
