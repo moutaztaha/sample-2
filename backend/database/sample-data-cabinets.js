@@ -464,6 +464,13 @@ async function generateSampleParts(projectItemId, item) {
     const doorWidth = item.width;
     const doorHeight = item.height;
     
+    // Get material costs once
+    const materialCostQuery = await runQuery('SELECT cost_per_unit FROM cabinet_materials WHERE id = ?', [panelMaterialId]);
+    const materialCost = materialCostQuery[0]?.cost_per_unit || 0;
+    
+    const edgeCostQuery = await runQuery('SELECT cost_per_unit FROM cabinet_materials WHERE id = ?', [edgeMaterialId]);
+    const edgeCostPerMeter = edgeCostQuery[0]?.cost_per_unit || 0;
+    
     // Parts to create
     const parts = [
       // Left side
@@ -580,13 +587,6 @@ async function generateSampleParts(projectItemId, item) {
       }
     ];
     
-    // Calculate costs
-    const materialCostQuery = await runQuery('SELECT cost_per_unit FROM cabinet_materials WHERE id = ?', [panelMaterialId]);
-    const materialCost = materialCostQuery[0]?.cost_per_unit || 0;
-    
-    const edgeCostQuery = await runQuery('SELECT cost_per_unit FROM cabinet_materials WHERE id = ?', [edgeMaterialId]);
-    const edgeCost = edgeCostQuery[0]?.cost_per_unit || 0;
-    
     // Insert parts
     for (const part of parts) {
       // Calculate part area in square meters
@@ -601,7 +601,7 @@ async function generateSampleParts(projectItemId, item) {
       
       // Calculate part cost (simplified)
       const panelCost = partArea * materialCost;
-      const edgeCost = edgeBandingLength * edgeCost;
+      const edgeCost = edgeBandingLength * edgeCostPerMeter;
       const unitCost = panelCost + edgeCost;
       const totalCost = unitCost * part.quantity;
       
