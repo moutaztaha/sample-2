@@ -6,8 +6,7 @@ import {
   Upload, 
   FileText,
   RefreshCw,
-  Columns,
-  Image
+  Columns
 } from 'lucide-react';
 import { inventoryService } from '../../services/inventoryService';
 import { useSocket } from '../../contexts/SocketContext';
@@ -22,29 +21,6 @@ import { useColumnPreferences } from '../../hooks/useColumnPreferences';
 import InventoryTable from './InventoryTable';
 import InventoryStats from './InventoryStats';
 import InventoryFilters from './InventoryFilters';
-
-interface InventoryItem {
-  id: number;
-  name: string;
-  sku: string;
-  description?: string;
-  category_name?: string;
-  subcategory_name?: string;
-  unit_name?: string;
-  location_name?: string;
-  supplier_name?: string;
-  quantity: number;
-  min_quantity: number;
-  max_quantity: number;
-  unit_price: number;
-  last_price?: number;
-  average_price?: number;
-  total_value: number;
-  is_low_stock: boolean;
-  item_type: string;
-  image_url?: string;
-  updated_at: string;
-}
 
 const DEFAULT_COLUMNS = [
   { id: 'name', label: 'Item Name', visible: true, width: 200, order: 1 },
@@ -68,7 +44,7 @@ const DEFAULT_COLUMNS = [
 ];
 
 const Inventory: React.FC = () => {
-  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedItemType, setSelectedItemType] = useState('all');
@@ -78,7 +54,7 @@ const Inventory: React.FC = () => {
   const [showStockAdjustmentModal, setShowStockAdjustmentModal] = useState(false);
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
-  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Array<{ id: number; name: string }>>([]);
   const [pagination, setPagination] = useState({
@@ -179,7 +155,7 @@ const Inventory: React.FC = () => {
     setShowStockMovementModal(true);
   };
 
-  const handleStockAdjustment = (item: InventoryItem) => {
+  const handleStockAdjustment = (item: any) => {
     setSelectedItem(item);
     setShowStockAdjustmentModal(true);
   };
@@ -277,7 +253,7 @@ const Inventory: React.FC = () => {
             onClick={() => setShowColumnCustomizer(true)}
             className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <Columns className="w-4 h-4 mr-2" />
+            <Columns className="h-4 w-4 mr-2" />
             Columns
           </button>
           
@@ -287,14 +263,14 @@ const Inventory: React.FC = () => {
                 onClick={handleExportCSV}
                 className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <Download className="w-4 h-4 mr-2" />
+                <Download className="h-4 w-4 mr-2" />
                 Export CSV
               </button>
               <button
                 onClick={handleExportPDF}
                 className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <FileText className="w-4 h-4 mr-2" />
+                <FileText className="h-4 w-4 mr-2" />
                 Export PDF
               </button>
             </>
@@ -302,7 +278,7 @@ const Inventory: React.FC = () => {
           
           {hasPermission('inventory.import') && (
             <label className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-              <Upload className="w-4 h-4 mr-2" />
+              <Upload className="h-4 w-4 mr-2" />
               Import CSV
               <input
                 type="file"
@@ -317,7 +293,7 @@ const Inventory: React.FC = () => {
             onClick={loadItems}
             className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </button>
           
@@ -326,7 +302,7 @@ const Inventory: React.FC = () => {
               onClick={handleAddItemClick}
               className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="h-4 w-4 mr-2" />
               Add Item
             </button>
           )}
