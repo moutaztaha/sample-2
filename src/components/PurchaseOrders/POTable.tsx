@@ -3,15 +3,17 @@ import {
   ShoppingCart, 
   Plus, 
   Eye,
+  Edit,
+  Trash2,
+  Clock,
   CheckCircle,
   XCircle,
-  Clock,
   Package,
   Truck,
   Calendar,
+  DollarSign,
   Send,
-  Edit,
-  Trash2,
+  Play,
   Settings,
   CheckSquare
 } from 'lucide-react';
@@ -32,22 +34,21 @@ interface POTableProps {
   onCreateNew: () => void;
 }
 
-const POTable: React.FC<POTableProps> = ({ 
-  purchaseOrders, 
-  loading, 
-  pagination, 
-  setPagination, 
-  user, 
-  onView, 
+const POTable: React.FC<POTableProps> = ({
+  purchaseOrders,
+  loading,
+  pagination,
+  setPagination,
+  user,
+  onView,
   onEdit,
   onQuickApproval,
   onPartialApproval,
-  onStatusUpdate, 
-  onReceiveItems, 
+  onStatusUpdate,
+  onReceiveItems,
   onDelete,
-  onCreateNew 
+  onCreateNew
 }) => {
-  // Helper functions for table
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent': return 'bg-red-100 text-red-800';
@@ -92,9 +93,10 @@ const POTable: React.FC<POTableProps> = ({
     }
   };
 
-  // Permission helpers - Updated to allow editing and deleting in all stages
+  // Permission helpers
   const canApprove = (po: any) => {
-    return po.status === 'pending_approval' && (user?.role === 'admin' || user?.role === 'manager');
+    return po.status === 'pending_approval' && 
+           (user?.role === 'admin' || user?.role === 'manager');
   };
 
   const canReceive = (po: any) => {
