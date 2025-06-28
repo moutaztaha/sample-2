@@ -7,8 +7,8 @@ interface CabinetModelCardProps {
 }
 
 const CabinetModelCard: React.FC<CabinetModelCardProps> = ({ model, onConfigure }) => {
-  // Default image if none provided
-  const imageUrl = model.image_url || 'https://via.placeholder.com/300x200?text=No+Image';
+  // Use a default image if none provided
+  const imageUrl = model.image_url || 'https://placehold.co/300x200?text=No+Image';
 
   return (
     <div className="bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow">
@@ -20,7 +20,7 @@ const CabinetModelCard: React.FC<CabinetModelCardProps> = ({ model, onConfigure 
           onError={(e) => {
             const target = e.target as HTMLImageElement;
             target.onerror = null; // Prevent infinite loop
-            target.src = 'https://via.placeholder.com/300x200?text=No+Image';
+            target.src = 'https://placehold.co/300x200?text=No+Image';
           }}
         />
         <div className="absolute top-2 right-2 bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
