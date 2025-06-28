@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, Ruler, DollarSign } from 'lucide-react';
+import { Package, Ruler } from 'lucide-react';
 
 interface CabinetModelCardProps {
   model: any;
@@ -18,7 +18,9 @@ const CabinetModelCard: React.FC<CabinetModelCardProps> = ({ model, onConfigure 
           alt={model.name} 
           className="w-full h-full object-cover"
           onError={(e) => {
-            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=No+Image';
+            const target = e.target as HTMLImageElement;
+            target.onerror = null; // Prevent infinite loop
+            target.src = 'https://via.placeholder.com/300x200?text=No+Image';
           }}
         />
         <div className="absolute top-2 right-2 bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">

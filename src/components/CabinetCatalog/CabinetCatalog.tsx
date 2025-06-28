@@ -4,13 +4,7 @@ import {
   Plus, 
   RefreshCw, 
   Filter, 
-  DollarSign, 
-  Ruler, 
-  Layers, 
-  Save,
-  FileText,
-  Download,
-  Scissors
+  Layers
 } from 'lucide-react';
 import { cabinetService } from '../../services/cabinetService';
 import CabinetModelCard from './CabinetModelCard';
@@ -298,8 +292,7 @@ const CabinetCatalog: React.FC = () => {
                               {project.item_count} {project.item_count === 1 ? 'cabinet' : 'cabinets'}
                             </span>
                             <span className="ml-4 flex items-center text-sm font-medium text-green-600">
-                              <DollarSign className="h-4 w-4 mr-1" />
-                              {project.total_cost.toFixed(2)}
+                              ${project.total_cost.toFixed(2)}
                             </span>
                           </div>
                         </div>
@@ -308,14 +301,12 @@ const CabinetCatalog: React.FC = () => {
                             onClick={() => handleViewProject(project)}
                             className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                           >
-                            <FileText className="h-4 w-4 mr-2" />
                             View Details
                           </button>
                           <button
                             onClick={() => handleGenerateCuttingList(project)}
                             className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                           >
-                            <Scissors className="h-4 w-4 mr-2" />
                             Cutting List
                           </button>
                         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Scissors, Layers, Package } from 'lucide-react';
+import { X, Download, Scissors, Layers } from 'lucide-react';
 import { cabinetService } from '../../services/cabinetService';
 
 interface CabinetCuttingOptimizationModalProps {
